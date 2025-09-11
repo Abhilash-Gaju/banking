@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Banking App (Design Patterns)</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    input, button { margin: 5px; padding: 5px; }
+  </style>
+</head>
+<body>
+  <h2>Banking Application</h2>
+
+  <div>
+    <label>Account Type:
+      <select id="accountType">
+        <option value="savings">Savings</option>
+        <option value="fixed">Fixed Deposit</option>
+        <option value="current">Current</option>
+      </select>
+    </label>
+    <button onclick="createAccount()">Create Account</button>
+  </div>
+
+  <div>
+    <input id="amount" type="number" placeholder="Enter amount" />
+    <button onclick="deposit()">Deposit</button>
+    <button onclick="withdraw()">Withdraw</button>
+    <button onclick="calculateInterest()">Calculate Interest</button>
+    <button onclick="undo()">Undo Last Transaction</button>
+  </div>
+
+  <h4>Balance: <span id="balance">0</span></h4>
+  <h4>Notifications:</h4>
+  <ul id="notifications"></ul>
+
+  <script>
+    // Observer Pattern
+    class Observer {
+      update(message) {}
+    }
+
+    class CustomerNotification extends Observer {
+      update(message) {
+        const ul = document.getElementById('notifications');
+        const li = document.createElement('li');
+        li.textContent = message;
+        ul.appendChild(li);
+      }
+    }
+
+    class Account {
+      constructor(interestStrategy) {
+        this.balance = 0;
+        this.observers = [];
+        this.interestStrategy = interestStrategy;
+      }
+
+      addObserver(observer) {
+        this.observers.push(observer);
+      }
+
+      notify(message) {
+        this.observers.forEach(observer => observer.update(message));
+        this.updateUI();
+      }
+
+      deposit(amount) {
+        this.balance += amount;
+        this.notify(`Deposited $${amount}`);
+      }
+
+      withdraw(amount) {
+        if (this.balance >= amount) {
+          this.balance -= amount;
+          this.notify(`Withdrew $${amount}`);
+        } else {
+          this.notify(`Withdrawal of $${amount} failed: insufficient funds.`);
+        }
+      }
+
+      calculateInterest() {
+        const interest = this.interestStrategy.calculate(this.balance);
+        this.balance += interest;
+        this.notify(`Interest added: $${interest.toFixed(2)}`);
+      }
+
+      updateUI() {
+        document.getElementById('balance').textContent = this.balance.toFixed(2);
+      }
+    }
+
+    // Strategy Pattern
+    class InterestStrategy {
+      calculate(balance) {
+        return 0;
+      }
+    }
+
+    class SavingsInterest extends InterestStrategy {
+      calculate(balance) {
+        return balance * 0.03;
+      }
+    }
+
+    class FixedDepositInterest extends InterestStrategy {
+      calculate(balance) {
+        return balance * 0.06;
+      }
+    }
+
+    class CurrentAccountInterest extends InterestStrategy {
+      calculate(balance) {
+        return balance * 0.01;
+      }
+    }
+
+    // Command Pattern
+    class TransactionCommand {
+      execute() {}
+      undo() {}
+    }
+
+    class DepositCommand extends TransactionCommand {
+      constructor(account, amount) {
+        super();
+        this.account = account;
+        this.amount = amount;
+      }
+
+      execute() {
+        this.account.deposit(this.amount);
+      }
+
+      undo() {
+        this.account.withdraw(this.amount);
+        this.account.notify(`Undo Deposit: $${this.amount}`);
+      }
+    }
+
+    class WithdrawCommand extends TransactionCommand {
+      constructor(account, amount) {
+        super();
+        this.account = account;
+        this.amount = amount;
+      }
+
+      execute() {
+        this.account.withdraw(this.amount);
+      }
+
+      undo() {
+        this.account.deposit(this.amount);
+        this.account.notify(`Undo Withdraw: $${this.amount}`);
+      }
+    }
+
+    class TransactionManager {
+      constructor() {
+        this.history = [];
+      }
+
+      execute(command) {
+        command.execute();
+        this.history.push(command);
+      }
+
+      undo() {
+        const command = this.history.pop();
+        if (command) {
+          command.undo();
+        }
+      }
+    }
+
+    // App logic
+    let account = null;
+    const manager = new TransactionManager();
+
+    function createAccount() {
+      const type = document.getElementById('accountType').value;
+      let strategy;
+      if (type === 'savings') strategy = new SavingsInterest();
+      else if (type === 'fixed') strategy = new FixedDepositInterest();
+      else strategy = new CurrentAccountInterest();
+
+      account = new Account(strategy);
+      account.addObserver(new CustomerNotification());
+      account.notify(`New ${type} account created.`);
+    }
+
+    function deposit() {
+      const amt = parseFloat(document.getElementById('amount').value);
+      if (amt > 0 && account) {
+        manager.execute(new DepositCommand(account, amt));
+      }
+    }
+
+    function withdraw() {
+      const amt = parseFloat(document.getElementById('amount').value);
+      if (amt > 0 && account) {
+        manager.execute(new WithdrawCommand(account, amt));
+      }
+    }
+
+    function calculateInterest() {
+      if (account) {
+        account.calculateInterest();
+      }
+    }
+
+    function undo() {
+      manager.undo();
+    }
+  </script>
+</body>
+</html>

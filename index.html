@@ -2,216 +2,266 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Banking App (Design Patterns)</title>
+  <title>BlueRiver Bank Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial; padding: 20px; }
-    input, button { margin: 5px; padding: 5px; }
+    :root {
+      --primary: #1E40AF; /* Dark blue */
+      --secondary: #2563EB; /* Blue */
+      --bg: #F3F4F6; /* Light gray */
+      --card-bg: #FFFFFF; /* White */
+      --text-dark: #111827;
+      --text-light: #6B7280;
+      --success: #16A34A;
+      --danger: #DC2626;
+      --accent: #F59E0B;
+    }
+
+    body { font-family: Arial, sans-serif; background: var(--bg); margin:0; padding:0; color: var(--text-dark); }
+
+    header {
+      background: var(--primary); color:white; padding:15px 20px;
+      display:flex; justify-content:space-between; align-items:center;
+      box-shadow:0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    header h1 { margin:0; font-size:1.5em; }
+
+    .container { max-width:1200px; margin:auto; padding:20px; }
+
+    .card {
+      background: var(--card-bg); padding:20px;
+      border-radius:10px; margin-bottom:20px;
+      box-shadow:0 4px 10px rgba(0,0,0,0.05);
+    }
+
+    input, select { padding:8px; margin:5px 0; width:100%; border:1px solid #D1D5DB; border-radius:5px; font-size:0.95em; }
+
+    button { padding:6px 12px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; }
+
+    .btn-primary { background: var(--secondary); color:white; }
+    .btn-danger { background: var(--danger); color:white; }
+    .btn-success { background: var(--success); color:white; }
+
+    .flex { display:flex; gap:10px; flex-wrap:wrap; }
+
+    .notification { background:#E5E7EB; padding:6px 10px; margin:3px 0; border-radius:5px; font-size:0.9em; }
+
+    h2 { color: var(--primary); margin-bottom:10px; }
+
+    /* Login page styling */
+    #loginPage { display:flex; align-items:center; justify-content:center; height:100vh; }
+    #loginPage .card { max-width:400px; width:100%; text-align:center; }
   </style>
 </head>
 <body>
-  <h2>Banking Application</h2>
 
-  <div>
-    <label>Account Type:
-      <select id="accountType">
-        <option value="savings">Savings</option>
-        <option value="fixed">Fixed Deposit</option>
-        <option value="current">Current</option>
+<!-- Login Page -->
+<div id="loginPage">
+  <div class="card">
+    <h2>BlueRiver Bank Login</h2>
+    <input type="text" id="username" placeholder="Username">
+    <select id="userRole">
+      <option value="user">User</option>
+      <option value="admin">Admin</option>
+    </select>
+    <button class="btn-primary" onclick="login()">Login</button>
+  </div>
+</div>
+
+<!-- Main Container -->
+<div id="mainContainer" class="container" style="display:none;">
+
+  <header>
+    <h1>BlueRiver Bank Dashboard</h1>
+    <div>
+      <select id="roleSelect">
+        <option value="user">User</option>
+        <option value="admin">Admin</option>
       </select>
-    </label>
-    <button onclick="createAccount()">Create Account</button>
+    </div>
+  </header>
+
+  <!-- User Dashboard -->
+  <div id="userDashboard">
+    <div class="card">
+      <h2>Accounts</h2>
+      <ul id="accountList"></ul>
+    </div>
+
+    <div class="card">
+      <h2>Apply Loan</h2>
+      <input type="number" id="loanAmount" placeholder="Loan Amount">
+      <select id="loanTerm">
+        <option value="12">12 Months</option>
+        <option value="24">24 Months</option>
+        <option value="36">36 Months</option>
+      </select>
+      <button class="btn-primary" onclick="applyLoan()">Apply Loan</button>
+    </div>
+
+    <div class="card">
+      <h2>Pay Bill</h2>
+      <input type="text" id="billType" placeholder="Bill Type">
+      <input type="number" id="billAmount" placeholder="Amount">
+      <button class="btn-primary" onclick="payBill()">Pay Bill</button>
+    </div>
+
+    <div class="card">
+      <h2>Spending Analytics</h2>
+      <canvas id="spendingChart"></canvas>
+    </div>
+
+    <div class="card">
+      <h2>Notifications</h2>
+      <div id="notifications"></div>
+    </div>
   </div>
 
-  <div>
-    <input id="amount" type="number" placeholder="Enter amount" />
-    <button onclick="deposit()">Deposit</button>
-    <button onclick="withdraw()">Withdraw</button>
-    <button onclick="calculateInterest()">Calculate Interest</button>
-    <button onclick="undo()">Undo Last Transaction</button>
+  <!-- Admin Dashboard -->
+  <div id="adminDashboard" style="display:none;">
+    <div class="card">
+      <h2>Loan Requests</h2>
+      <ul id="loanRequests"></ul>
+      <button class="btn-danger" onclick="undoLast()">Undo Last Action</button>
+    </div>
   </div>
 
-  <h4>Balance: <span id="balance">0</span></h4>
-  <h4>Notifications:</h4>
-  <ul id="notifications"></ul>
+</div>
 
-  <script>
-    // Observer Pattern
-    class Observer {
-      update(message) {}
-    }
+<script>
+  let currentUser = null;
+  let accounts = [{id:'acc1', name:'Savings', balance:50000}];
+  let loans = [];
+  let bills = [];
+  let notifications = [];
+  let commandHistory = [];
 
-    class CustomerNotification extends Observer {
-      update(message) {
-        const ul = document.getElementById('notifications');
-        const li = document.createElement('li');
-        li.textContent = message;
-        ul.appendChild(li);
-      }
-    }
+  // Login
+  function login() {
+    const username = document.getElementById('username').value.trim();
+    const role = document.getElementById('userRole').value;
+    if(!username) return alert('Enter username');
+    currentUser = {name:username, role};
+    document.getElementById('loginPage').style.display='none';
+    document.getElementById('mainContainer').style.display='block';
+    document.getElementById('roleSelect').value=role;
+    toggleDashboard();
+    renderAccounts();
+    renderLoanRequests();
+    renderChart();
+    notify(`Welcome ${username} (${role})`);
+  }
 
-    class Account {
-      constructor(interestStrategy) {
-        this.balance = 0;
-        this.observers = [];
-        this.interestStrategy = interestStrategy;
-      }
+  // Toggle dashboards
+  document.getElementById('roleSelect').addEventListener('change', e=>{
+    toggleDashboard();
+  });
 
-      addObserver(observer) {
-        this.observers.push(observer);
-      }
+  function toggleDashboard(){
+    const role = document.getElementById('roleSelect').value;
+    document.getElementById('userDashboard').style.display = role==='user'?'block':'none';
+    document.getElementById('adminDashboard').style.display = role==='admin'?'block':'none';
+  }
 
-      notify(message) {
-        this.observers.forEach(observer => observer.update(message));
-        this.updateUI();
-      }
+  function renderAccounts() {
+    const ul = document.getElementById('accountList');
+    ul.innerHTML = '';
+    accounts.forEach(a => {
+      const li = document.createElement('li');
+      li.textContent = `${a.name}: ₹${a.balance}`;
+      ul.appendChild(li);
+    });
+  }
 
-      deposit(amount) {
-        this.balance += amount;
-        this.notify(`Deposited $${amount}`);
-      }
+  function notify(msg) {
+    notifications.unshift(msg);
+    if(notifications.length>10) notifications.pop();
+    const div = document.getElementById('notifications');
+    div.innerHTML = '';
+    notifications.forEach(n => {
+      const el = document.createElement('div');
+      el.className='notification';
+      el.textContent = n;
+      div.appendChild(el);
+    });
+  }
 
-      withdraw(amount) {
-        if (this.balance >= amount) {
-          this.balance -= amount;
-          this.notify(`Withdrew $${amount}`);
-        } else {
-          this.notify(`Withdrawal of $${amount} failed: insufficient funds.`);
-        }
-      }
+  function applyLoan() {
+    const amt = Number(document.getElementById('loanAmount').value);
+    const term = Number(document.getElementById('loanTerm').value);
+    if(!amt || !term) return alert('Enter valid loan');
+    const loan = {id:Date.now(), amount:amt, term:term, status:'Pending'};
+    loans.push(loan);
+    notify(`Loan applied: ₹${amt}`);
+    renderLoanRequests();
+  }
 
-      calculateInterest() {
-        const interest = this.interestStrategy.calculate(this.balance);
-        this.balance += interest;
-        this.notify(`Interest added: $${interest.toFixed(2)}`);
-      }
+  function approveLoan(id) {
+    const loan = loans.find(l=>l.id===id);
+    if(!loan) return;
+    const prevStatus = loan.status;
+    loan.status = 'Approved';
+    commandHistory.push({loan, prevStatus});
+    notify(`Loan ${id} Approved`);
+    renderLoanRequests();
+  }
 
-      updateUI() {
-        document.getElementById('balance').textContent = this.balance.toFixed(2);
-      }
-    }
+  function rejectLoan(id) {
+    const loan = loans.find(l=>l.id===id);
+    if(!loan) return;
+    const prevStatus = loan.status;
+    loan.status = 'Rejected';
+    commandHistory.push({loan, prevStatus});
+    notify(`Loan ${id} Rejected`);
+    renderLoanRequests();
+  }
 
-    // Strategy Pattern
-    class InterestStrategy {
-      calculate(balance) {
-        return 0;
-      }
-    }
+  function undoLast() {
+    const last = commandHistory.pop();
+    if(!last) return;
+    last.loan.status = last.prevStatus;
+    notify(`Undo: Loan ${last.loan.id} reverted to ${last.prevStatus}`);
+    renderLoanRequests();
+  }
 
-    class SavingsInterest extends InterestStrategy {
-      calculate(balance) {
-        return balance * 0.03;
-      }
-    }
+  function renderLoanRequests() {
+    const ul = document.getElementById('loanRequests');
+    ul.innerHTML = '';
+    loans.forEach(l => {
+      const li = document.createElement('li');
+      li.textContent = `ID:${l.id} Amount:₹${l.amount} Status:${l.status} `;
+      const approveBtn = document.createElement('button');
+      approveBtn.textContent='Approve'; approveBtn.className='btn-primary'; approveBtn.onclick=()=>approveLoan(l.id);
+      const rejectBtn = document.createElement('button');
+      rejectBtn.textContent='Reject'; rejectBtn.className='btn-danger'; rejectBtn.onclick=()=>rejectLoan(l.id);
+      li.appendChild(approveBtn);
+      li.appendChild(rejectBtn);
+      ul.appendChild(li);
+    });
+  }
 
-    class FixedDepositInterest extends InterestStrategy {
-      calculate(balance) {
-        return balance * 0.06;
-      }
-    }
+  function payBill() {
+    const type = document.getElementById('billType').value;
+    const amt = Number(document.getElementById('billAmount').value);
+    if(!type || !amt) return alert('Enter valid bill info');
+    bills.push({type, amt, date:new Date().toLocaleDateString()});
+    notify(`Bill Paid: ${type} ₹${amt}`);
+  }
 
-    class CurrentAccountInterest extends InterestStrategy {
-      calculate(balance) {
-        return balance * 0.01;
-      }
-    }
+  function renderChart() {
+    const ctx = document.getElementById('spendingChart').getContext('2d');
+    const data = {
+      labels: ['Food','Transport','Bills'],
+      datasets: [{
+        label:'Spending',
+        data: [2500,800,1200],
+        backgroundColor:['#2563EB','#1E40AF','#F59E0B']
+      }]
+    };
+    new Chart(ctx,{type:'pie',data});
+  }
+</script>
 
-    // Command Pattern
-    class TransactionCommand {
-      execute() {}
-      undo() {}
-    }
-
-    class DepositCommand extends TransactionCommand {
-      constructor(account, amount) {
-        super();
-        this.account = account;
-        this.amount = amount;
-      }
-
-      execute() {
-        this.account.deposit(this.amount);
-      }
-
-      undo() {
-        this.account.withdraw(this.amount);
-        this.account.notify(`Undo Deposit: $${this.amount}`);
-      }
-    }
-
-    class WithdrawCommand extends TransactionCommand {
-      constructor(account, amount) {
-        super();
-        this.account = account;
-        this.amount = amount;
-      }
-
-      execute() {
-        this.account.withdraw(this.amount);
-      }
-
-      undo() {
-        this.account.deposit(this.amount);
-        this.account.notify(`Undo Withdraw: $${this.amount}`);
-      }
-    }
-
-    class TransactionManager {
-      constructor() {
-        this.history = [];
-      }
-
-      execute(command) {
-        command.execute();
-        this.history.push(command);
-      }
-
-      undo() {
-        const command = this.history.pop();
-        if (command) {
-          command.undo();
-        }
-      }
-    }
-
-    // App logic
-    let account = null;
-    const manager = new TransactionManager();
-
-    function createAccount() {
-      const type = document.getElementById('accountType').value;
-      let strategy;
-      if (type === 'savings') strategy = new SavingsInterest();
-      else if (type === 'fixed') strategy = new FixedDepositInterest();
-      else strategy = new CurrentAccountInterest();
-
-      account = new Account(strategy);
-      account.addObserver(new CustomerNotification());
-      account.notify(`New ${type} account created.`);
-    }
-
-    function deposit() {
-      const amt = parseFloat(document.getElementById('amount').value);
-      if (amt > 0 && account) {
-        manager.execute(new DepositCommand(account, amt));
-      }
-    }
-
-    function withdraw() {
-      const amt = parseFloat(document.getElementById('amount').value);
-      if (amt > 0 && account) {
-        manager.execute(new WithdrawCommand(account, amt));
-      }
-    }
-
-    function calculateInterest() {
-      if (account) {
-        account.calculateInterest();
-      }
-    }
-
-    function undo() {
-      manager.undo();
-    }
-  </script>
 </body>
 </html>
